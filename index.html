@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Door Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 p-6">
+  <h1 class="text-3xl font-bold text-indigo-600 mb-4">🚪 Door Monitor</h1>
+
+  <div id="status" class="text-xl font-semibold mb-6">Loading…</div>
+  <canvas id="chart" height="120"></canvas>
+
+  <script>
+    const GAS_BASE = 'https://script.google.com/macros/s/AKfycbxspjwwxk3z_TdUvyZplPK_MtsaYCqs-_zltFx5bbABX5JB4IKy8zhB0apo9hsSGVlk/exec'; // ← exec URL
+
+    async function fetchLatest(){
+      const res = await fetch(`${GAS_BASE}?mode=latest`);
+      return res.json();
+    }
+    async function fetchHistory(){
+      const res = await fetch(`${GAS_BASE}?mode=history`);
+      return res.json();
+    }
+
+    // 状態表示
+    async function updateStatus(){
+      const d = await fetchLatest();
+      const color = d.status === 'ON' ? 'text-green-600' : 'text-red-600';
+      document.getElementById('status').innerHTML =
+        `<span class="${color}">Current: ${d.status}</span> @ ${new Date(d.ts).toLocaleString()}`;
+    }
+
+    // グラフ描画
+    async function drawChart(){
+      const raw = await fetchHistory();
+      const labels = raw.map(r => new Date(r.ts));
+      const values = raw.map(r => r.status === 'ON' ? 1 : 0);
+
+      const ctx = document.getElementById('chart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Door State',
+            data: values,
+            stepped: true,
+            borderWidth: 2,
+          }]
+        },
+        options: {
+          scales: {
+            y: { ticks: { callback: v => v === 1 ? 'ON' : 'OFF' }, min: -0.1, max: 1.1 },
+            x: { type: 'time', time: { tooltipFormat: 'yyyy/MM/dd HH:mm' } }
+          }
+        }
+      });
+    }
+
+    // 初期ロード
+    (async () => {
+      await updateStatus();
+      await drawChart();
+      // 10 秒ごとに最新状態だけ更新
+      setInterval(updateStatus, 10000);
+    })();
+  </script>
+</body>
+</html>
